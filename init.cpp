@@ -289,7 +289,6 @@ int audio_decode_frame(AVCodecContext *aCodecCtx, uint8_t *audio_buf, int buf_si
         exit(EXIT_FAILURE);
     }
 
-//    cout << "INNNNNNNN" << endl << "-----------------------------------------------" << endl << endl;
     while(true)
     {
         while(avpkt.size > 0)
@@ -329,13 +328,7 @@ int audio_decode_frame(AVCodecContext *aCodecCtx, uint8_t *audio_buf, int buf_si
                     audio_buf[i++ + return_size] = avfrm->data[1][j];
                     audio_buf[i++ + return_size] = avfrm->data[1][j+1];
                     j += 2;
-
-//                    cout << (int)avfrm->data[0][j] << " ";
-//                    cout << (int)avfrm->data[0][j+1] << " ";
-//                    cout << (int)avfrm->data[1][j] << " ";
-//                    cout << (int)avfrm->data[1][j+1] << " ";
                 }
-//                cout << endl << endl;
 
                 buf_size -= data_size;
                 return_size += data_size;
@@ -347,19 +340,6 @@ int audio_decode_frame(AVCodecContext *aCodecCtx, uint8_t *audio_buf, int buf_si
 
             if(data_size > buf_size)
             {
-//                unsigned i = 0;
-//                unsigned j = 0;
-//                cout << "OUTTTTTTTTTTTTT" << endl;
-//                while(j < avfrm->nb_samples*sample_size)
-//                {
-//                    cout << (int)avfrm->data[0][j] << " ";
-//                    cout << (int)avfrm->data[0][j+1] << " ";
-//                    cout << (int)avfrm->data[1][j] << " ";
-//                    cout << (int)avfrm->data[1][j+1] << " ";
-//                    j += 2;
-//                }
-//                cout << data_size << " data_size" << endl;
-//                cout << "-------------------------------------------------------------------" << endl << endl;
                 return return_size;
             }
         }
