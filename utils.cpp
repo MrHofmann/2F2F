@@ -1,5 +1,4 @@
 #include "utils.h"
-#include "filter.h"
 #include "filtah.h"
 #include "fft.h"
 #include <math.h>
@@ -59,7 +58,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
     TrackState *track_state = ((UserData*)userdata)->track_state;
     FilterState *filter_state = ((UserData*)userdata)->filter_state;
     AVCodecContext *codec_ctx = track_state->codec_context; //Codec informacija
-    FilterMethod filter_method = filter_state->filter_method;
+    BaseFilter::Method filter_method = filter_state->filter_method;
 
     unsigned num_channels = codec_ctx->channels;
     unsigned sample_size = track_state->audio_sample_size;
@@ -108,83 +107,87 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
             len -= len1;
             audio_buf_index += len1;
         }
-        else
+        else if(filter_method == BaseFilter::FFT)
         {
-            if(filter_method == FFT)
+            int tmp=0;
+            if(len2+len1 > FFT_AUDIO_BUFFER_SIZE)
             {
-                int tmp=0;
-                if(len2+len1 > FFT_AUDIO_BUFFER_SIZE)
-                {
-                    tmp = FFT_AUDIO_BUFFER_SIZE - len2;
-                    memcpy(fft_buf + len2, audio_buf + audio_buf_index, tmp);
-                    len2 += tmp;
-                }
-                else
-                {
-                    memcpy(fft_buf + len2, audio_buf + audio_buf_index, len1);
-                    len2+=len1;
-                }
-
-                if(len2 == FFT_AUDIO_BUFFER_SIZE)
-                {
-                    std::vector<std::vector<float> > splitted_channels;
-                    split_channels((float *)fft_buf, len2/sample_size, num_channels, splitted_channels);
-
-            //AUDIO PROCESSING
-            //
-    //                update_volume(splitted_channels, len2/4);
-                    for(unsigned i=0; i<num_channels; i++)
-                    {
-    //                    window(splitted_channels[i], len2/4);
-                        Filter equalizer(codec_ctx->sample_rate, splitted_channels[i].size());
-                        equalizer.set_kernel(filter_state->f_gain);
-//                        equalizer.set_kernel(4, 500.0, 1.0);
-                        equalizer.fft_filter(splitted_channels[i]);
-                    }
-            //
-            //AUDIO PROCESSING
-
-                    merge_channels(splitted_channels, (float *)fft_buf, len2/sample_size);
-                    memcpy(stream, fft_buf, len2);
-
-                    stream += len2;
-                    len2 = 0;
-                }
-
-                if(tmp != 0)
-                {
-                    len1 = tmp;
-                    tmp = 0;
-                }
-
-                len -= len1;
-                audio_buf_index += len1;
+                tmp = FFT_AUDIO_BUFFER_SIZE - len2;
+                memcpy(fft_buf + len2, audio_buf + audio_buf_index, tmp);
+                len2 += tmp;
             }
             else
             {
-                memcpy(fft_buf, audio_buf + audio_buf_index, len1);
+                memcpy(fft_buf + len2, audio_buf + audio_buf_index, len1);
+                len2+=len1;
+            }
 
+            if(len2 == FFT_AUDIO_BUFFER_SIZE)
+            {
                 std::vector<std::vector<float> > splitted_channels;
-                split_channels((float *)fft_buf, len1/sample_size, num_channels, splitted_channels);
+                split_channels((float *)fft_buf, len2/sample_size, num_channels, splitted_channels);
+
+                BaseFilter *filter = filter_state->filters[0];
+                filter->set_kernel_size(len2/(num_channels*sample_size));
+                filter->set_sample_rate(44100);
+                filter->update_kernel();
 
         //AUDIO PROCESSING
         //
-//                update_volume(splitted_channels, len2/sample_size);
+//                update_volume(splitted_channels, len2/4);
                 for(unsigned i=0; i<num_channels; i++)
                 {
-//                    window(splitted_channels[i], len2/sample_size);
-
+//                    window(splitted_channels[i], len2/4);
+                    splitted_channels[i] = filter->convolve(splitted_channels[i], filter_state->filter_method);
                 }
         //
         //AUDIO PROCESSING
 
-                merge_channels(splitted_channels, (float *)fft_buf, len1/sample_size);
-                memcpy(stream, fft_buf, len1);
+                merge_channels(splitted_channels, (float *)fft_buf, len2/sample_size);
+                memcpy(stream, fft_buf, len2);
 
-                stream += len1;
-                len -= len1;
-                audio_buf_index += len1;
+                stream += len2;
+                len2 = 0;
             }
+
+            if(tmp != 0)
+            {
+                len1 = tmp;
+                tmp = 0;
+            }
+
+            len -= len1;
+            audio_buf_index += len1;
+        }
+        else
+        {
+            memcpy(fft_buf, audio_buf + audio_buf_index, len1);
+
+            std::vector<std::vector<float> > splitted_channels;
+            split_channels((float *)fft_buf, len1/sample_size, num_channels, splitted_channels);
+
+            //INITIALIZE FILTERS HERE
+            BaseFilter *filter = filter_state->filters[0];
+            filter->set_kernel_size(len1/(num_channels*sample_size));
+            filter->set_sample_rate(44100);
+            filter->update_kernel();
+    //AUDIO PROCESSING
+    //
+//            update_volume(splitted_channels, len2/sample_size);
+            for(unsigned i=0; i<num_channels; i++)
+            {
+//                window(splitted_channels[i], len2/sample_size);
+                splitted_channels[i] = filter->convolve(splitted_channels[i], filter_state->filter_method);
+            }
+    //
+    //AUDIO PROCESSING
+
+            merge_channels(splitted_channels, (float *)fft_buf, len1/sample_size);
+            memcpy(stream, fft_buf, len1);
+
+            stream += len1;
+            len -= len1;
+            audio_buf_index += len1;
         }
 //
 //FFT GOES HERE
@@ -519,3 +522,81 @@ memcpy(stream, fft_buf, len1);
 stream += len1;
 len -= len1;
 audio_buf_index += len1;*/
+
+/*
+ * switch(filter_state->filters[0]->type())
+                {
+                    case BaseFilter::EQUALIZER:{
+                        Equalizer *eq = (Equalizer*)(filter_state->filters[0]);
+                        eq->set_f_gain(filter_state->f_gain);
+                        eq->set_kernel_size(len1/(sample_size*num_channels));
+                        eq->set_sample_rate(codec_ctx->sample_rate);
+                        eq->update_kernel();
+                        break;
+                    }
+                    case BaseFilter::LOW_PASS:
+                    {
+                        LowPass *low = (LowPass*)(filter_state->filters[0]);
+                        low->set_order(filter_state->order);
+                        low->set_kernel_size(len1/(sample_size*num_channels));
+                        low->set_sample_rate(codec_ctx->sample_rate);
+                        low->set_cutoff(1000.0);
+                        low->set_gain(1.0);
+                        low->update_kernel();
+                        break;
+                    }
+                    case BaseFilter::HIGH_PASS:
+                    {
+                        HighPass *high = (HighPass*)(filter_state->filters[0]);
+                        high->set_order(filter_state->order);
+                        high->set_kernel_size(len1/(sample_size*num_channels));
+                        high->set_sample_rate(codec_ctx->sample_rate);
+                        high->set_cutoff(1000.0);
+                        high->set_gain(1.0);
+                        high->update_kernel();
+                        break;
+                    }
+                    case BaseFilter::BAND_PASS:
+                    {
+                        BandPass *band = (BandPass*)(filter_state->filters[0]);
+                        band->set_order(filter_state->order);
+                        band->set_kernel_size(len1/(sample_size*num_channels));
+                        band->set_sample_rate(codec_ctx->sample_rate);
+                        band->set_mean(1000.0);
+                        band->set_width(200.0);
+                        band->set_gain(1.0);
+                        band->update_kernel();
+                        break;
+                    }
+                    default:
+                        break;
+                }
+*/
+
+/*
+ *                 switch(filter_state->filters[0]->type())
+                {
+                    case BaseFilter::EQUALIZER:
+                    {
+                        std::cout << "EQUALIZER" << std::endl;
+                        break;
+                    }
+                    case BaseFilter::LOW_PASS:
+                    {
+                        std::cout << "LOW_PASS" << std::endl;
+                        break;
+                    }
+                    case BaseFilter::HIGH_PASS:
+                    {
+                        std::cout << "HIGH_PASS" << std::endl;
+                        break;
+                    }
+                    case BaseFilter::BAND_PASS:
+                    {
+                        std::cout << "BAND_PASS" << std::endl;
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                */

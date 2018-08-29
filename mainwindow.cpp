@@ -84,11 +84,9 @@ MainWindow::MainWindow() :
     renderBoxLayout2->addWidget(canvasEQ);
     ui->page_2->setLayout(renderBoxLayout2);
 
-    _filter_type = EQUALIZER;
+
     _master_volume = 100;
     _balance = 100;
-    _order = 0;
-    _width = 0;
 
     _playback_enable = false;
     _playback_stop = false;
@@ -107,8 +105,14 @@ MainWindow::MainWindow() :
     _track_state.sdl_quit = 0;
 
     _filter_state.filter_enabled = false;
-    _filter_state.filter_method = FFT;
+    _filter_state.filter_method = BaseFilter::FFT;
     _filter_state.f_gain = std::vector<int>(10, 100);
+    _filter_state.filters.push_back(new Equalizer(1024, 44100, &_filter_state.f_gain));
+    _filter_state.filter_type = BaseFilter::EQUALIZER;
+    _filter_state.order = 1;
+    _filter_state.cutoff = 1000.0;
+    _filter_state.width = 1.0;
+    _filter_state.dc_gain = 1.0;
 
     _user_data.track_state = &_track_state;
     _user_data.filter_state = &_filter_state;
@@ -373,12 +377,20 @@ void MainWindow::radio_disable_clicked()
     _filter_state.filter_enabled = false;
 }
 
+
 void MainWindow::radio_equalizer_clicked()
 {
-
-    _filter_type = EQUALIZER;
-    _filter_state.filter_method = FFT;
+    _filter_state.filter_type = BaseFilter::EQUALIZER;
+    _filter_state.filter_method = BaseFilter::FFT;
     ui->StackedWidget->setCurrentIndex(0);
+
+    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+        delete _filter_state.filters[i];
+    _filter_state.filters.clear();
+
+    BaseFilter *equalizer = new Equalizer(1024, 44100, &_filter_state.f_gain);
+//    equalizer->update_kernel();
+    _filter_state.filters.push_back(equalizer);
 
     ui->SliderGain0->setEnabled(true);
     ui->SliderGain1->setEnabled(true);
@@ -394,9 +406,20 @@ void MainWindow::radio_equalizer_clicked()
 
 void MainWindow::radio_low_clicked()
 {
-    _filter_type = LOW_PASS;
-    _filter_state.filter_method = CONV;
+    _filter_state.filter_type = BaseFilter::LOW_PASS;
+    _filter_state.filter_method = BaseFilter::CONV;
     ui->StackedWidget->setCurrentIndex(1);
+
+    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+        delete _filter_state.filters[i];
+    _filter_state.filters.clear();
+
+    unsigned *order = &_filter_state.order;
+    double *cutoff = &_filter_state.cutoff;
+    double *gain = &_filter_state.dc_gain;
+    BaseFilter *low_pass = new LowPass(1024, 44100, order, cutoff, gain);
+//    low_pass->update_kernel();
+    _filter_state.filters.push_back(low_pass);
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);
@@ -412,9 +435,20 @@ void MainWindow::radio_low_clicked()
 
 void MainWindow::radio_high_clicked()
 {
-    _filter_type = HIGH_PASS;
-    _filter_state.filter_method = CONV;
+    _filter_state.filter_type = BaseFilter::HIGH_PASS;
+    _filter_state.filter_method = BaseFilter::OA_CONV;
     ui->StackedWidget->setCurrentIndex(1);
+
+    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+        delete _filter_state.filters[i];
+    _filter_state.filters.clear();
+
+    unsigned *order = &_filter_state.order;
+    double *cutoff = &_filter_state.cutoff;
+    double *gain = &_filter_state.dc_gain;
+    BaseFilter *high_pass = new HighPass(1024, 44100, order, cutoff, gain);
+//    high_pass->update_kernel();
+    _filter_state.filters.push_back(high_pass);
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);
@@ -430,9 +464,21 @@ void MainWindow::radio_high_clicked()
 
 void MainWindow::radio_band_clicked()
 {
-    _filter_type = BAND_PASS;
-    _filter_state.filter_method = CONV;
+    _filter_state.filter_type = BaseFilter::BAND_PASS;
+    _filter_state.filter_method = BaseFilter::OA_FFT;
     ui->StackedWidget->setCurrentIndex(1);
+
+    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+        delete _filter_state.filters[i];
+    _filter_state.filters.clear();
+
+    unsigned *order = &_filter_state.order;
+    double *mean = &_filter_state.cutoff;
+    double *width = &_filter_state.width;
+    double *gain = &_filter_state.dc_gain;
+    BaseFilter *band_pass = new BandPass(1024, 44100, order, mean, width, gain);
+//    band_pass->update_kernel();
+    _filter_state.filters.push_back(band_pass);
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);

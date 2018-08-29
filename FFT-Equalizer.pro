@@ -27,7 +27,6 @@ LIBS += -lavcodec -lavformat -lavutil -lSDL2
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    filter.cpp \
     fft_c.cpp \
     fft.cpp \
     mainthread.cpp \
@@ -38,7 +37,6 @@ SOURCES += main.cpp\
     filtah.cpp
 
 HEADERS  += mainwindow.h \
-    filter.h \
     fft_c.h \
     fft.h \
     mainthread.h \

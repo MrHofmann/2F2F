@@ -49,9 +49,6 @@ private Q_SLOTS:
     void decode_finished();
 
 private:
-    enum FilterType {EQUALIZER, LOW_PASS, HIGH_PASS, BAND_PASS, BAND_STOP};
-    FilterType _filter_type;
-
     Ui::MainWindow *ui;
     TrackState _track_state;
     FilterState _filter_state;
@@ -59,8 +56,6 @@ private:
 
     int _master_volume;
     int _balance;
-    int _order;
-    int _width;
 
     bool _playback_enable;
     bool _playback_stop;
