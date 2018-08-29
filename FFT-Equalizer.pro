@@ -23,25 +23,29 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 
-LIBS += -lavcodec -lavformat -lavutil -lSDL
+LIBS += -lavcodec -lavformat -lavutil -lSDL2
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    band_pass.cpp \
-    fft.cpp \
     filter.cpp \
-    high_pass.cpp \
-    init.cpp \
-    low_pass.cpp \
-    playback_thread.cpp
+    fft_c.cpp \
+    fft.cpp \
+    mainthread.cpp \
+    decodethread.cpp \
+    datastructures.cpp \
+    utils.cpp \
+    renderarea.cpp \
+    filtah.cpp
 
 HEADERS  += mainwindow.h \
-    band_pass.h \
-    fft.h \
     filter.h \
-    high_pass.h \
-    init.h \
-    low_pass.h \
-    playback_thread.h
+    fft_c.h \
+    fft.h \
+    mainthread.h \
+    decodethread.h \
+    datastructures.h \
+    utils.h \
+    renderarea.h \
+    filtah.h
 
 FORMS    += mainwindow.ui
