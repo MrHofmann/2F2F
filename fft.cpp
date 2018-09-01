@@ -6,8 +6,17 @@
 
 template std::complex<double> *fft_cpp<float>(const float samples[], unsigned len);
 
-template void zero_pad<int16_t>(std::vector<int16_t> &x, unsigned power);
+template void zero_pad<float>(std::vector<float> &x, unsigned power);
+template void zero_pad<float>(std::vector<float> &x, std::vector<float> &h);
+template void zero_pad<float>(std::vector<float> &x, std::vector<std::complex<double> > &f);
 
+
+template std::vector<float> convolution_in<float>(const std::vector<float> &x, const std::vector<float> &h);
+template std::vector<float> convolution_out<float>(const std::vector<float> &x, const std::vector<float> &h);
+template std::vector<float> convolution_circ<float>(const std::vector<float> &x, const std::vector<float> &h);
+template std::vector<float> convolution_fft<float>(const std::vector<float> &x, const std::vector<float> &h);
+
+//template std::vector<int16_t> convolution_fft<int16_t>(const std::vector<int16_t> &x, const std::vector<int16_t> &h);
 
 
 template<typename T>
@@ -29,12 +38,23 @@ template<typename T>
 void zero_pad(std::vector<T> &x, std::vector<T> &h)
 {
 //    double power = std::ceil(std::log2(std::max(x.size(), h.size())));
-    double power = std::ceil(std::log2(x.size() + h.size()));
+    double power = std::ceil(std::log2(x.size() + h.size() - 1));
     while(x.size() < std::pow(2, power))
         x.push_back(0);
     while(h.size() < std::pow(2, power))
         h.push_back(0);
 }
+
+template<typename T>
+void zero_pad(std::vector<T> &x, std::vector<std::complex<double> > &f)
+{
+    double power = std::ceil(std::log2(x.size() + f.size() - 1));
+    while(x.size() < std::pow(2, power))
+        x.push_back(0);
+    while(f.size() < std::pow(2, power))
+        f.push_back(0);
+}
+
 
 
 template<typename T>
@@ -126,6 +146,7 @@ int16_t *ifft16_cpp(std::complex<double> samples[], unsigned len)
 }
 
 
+
 //FIR - neutral filter
 std::vector<std::complex<double> > neutral(unsigned n)
 {
@@ -196,12 +217,13 @@ void butterworth(double cutoff, double rate, double &b0, double &b1, double &b2,
 
 //NUMERICKE METODE - circular convolution
 //x = [1,2,2], y = [1,3,1], conv(x,y) = [9,7,9]
-std::vector<int16_t> convolution_circ(const std::vector<int16_t> &x, const std::vector<int16_t> &h)
+template<typename T>
+std::vector<T> convolution_circ(const std::vector<T> &x, const std::vector<T> &h)
 {
-    std::vector<int16_t> y;
+    std::vector<T> y;
     for(unsigned i=0; i<x.size(); i++)
     {
-        int sum = 0;
+        T sum = 0;
         for(unsigned j=0, k = x.size()+i; j<x.size(); j++, k--)
             sum += x[j]*h[k%x.size()];
 
@@ -212,17 +234,21 @@ std::vector<int16_t> convolution_circ(const std::vector<int16_t> &x, const std::
 }
 //DSP GUIDE - output side algorithm (linear convolution)
 //x = [1,2,2], y = [1,3,1], conv(x,y) = [1,5,9,8,2]
-std::vector<int16_t> convolution_out(const std::vector<int16_t> &x, const std::vector<int16_t> &h)
+template<typename T>
+std::vector<T> convolution_out(const std::vector<T> &x, const std::vector<T> &h)
 {
-    std::vector<int16_t> y;
+    std::vector<T> y;
     int output_size = x.size() + h.size() - 1;
     for(int i=0; i<output_size; i++)
     {
-        int sum = 0;
+        T sum = 0;
         for(int j=0; j<h.size(); j++)
+        {
             if(i-j >= 0 && i-j < x.size())
+            {
                 sum += h[j]*x[i-j];
-
+            }
+        }
         y.push_back(sum);
     }
 
@@ -230,12 +256,11 @@ std::vector<int16_t> convolution_out(const std::vector<int16_t> &x, const std::v
 }
 //DSP GUIDE - input side algorithm (linear convolution)
 //x = [1,2,2], y = [1,3,1], conv(x,y) = [1,5,9,8,2]
-std::vector<int16_t> convolution_in(const std::vector<int16_t> &x, const std::vector<int16_t> &h)
+template<typename T>
+std::vector<T> convolution_in(const std::vector<T> &x, const std::vector<T> &h)
 {
-    std::vector<int16_t> y;
-    int output_size = x.size() + h.size() - 1;
-    for(int i=0; i<output_size; i++)
-        y.push_back(0);
+    unsigned output_size = x.size() + h.size() - 1;
+    std::vector<T> y = std::vector<T>(output_size, 0.0);
 
     for(int i=0; i<x.size(); i++)
         for(int j=0; j<h.size(); j++)
@@ -247,10 +272,11 @@ std::vector<int16_t> convolution_in(const std::vector<int16_t> &x, const std::ve
 //WWW - linear fft convolution
 //x0 = [1,2,2,0,0], y0 = [1,3,1,0,0], X = fft(x0), Y = fft(y0), ifft(X*Y) = [1,5,9,8,2]
 //output size = input_size_1 + input_size_2 - 1
-std::vector<int16_t> convolution_fft(const std::vector<int16_t> &x, const std::vector<int16_t> &h)
+template<typename T>
+std::vector<T> convolution_fft(const std::vector<T> &x, const std::vector<T> &h)
 {
-    std::vector<int16_t> x_padded = x;
-    std::vector<int16_t> h_padded = h;
+    std::vector<T> x_padded = x;
+    std::vector<T> h_padded = h;
     zero_pad(x_padded, h_padded);
 
     std::complex<double> *xf = fft_cpp(x_padded.data(), x_padded.size());
@@ -260,7 +286,7 @@ std::vector<int16_t> convolution_fft(const std::vector<int16_t> &x, const std::v
     for(unsigned i=0; i<h_padded.size(); i++)
         yf[i] = xf[i]*hf[i];
 
-    std::vector<int16_t> y;
+    std::vector<T> y;
 
     std::complex<double> *tmp = ifft_cpp(yf, h_padded.size());
     for(unsigned i=0; i<h_padded.size(); i++)
@@ -273,7 +299,7 @@ std::vector<int16_t> convolution_fft(const std::vector<int16_t> &x, const std::v
     return y;
 }
 
-std::vector<int16_t> convolution_fft(std::vector<int16_t> &x, std::vector<std::complex<double> > &hf)
+std::vector<int16_t> convolution_fft16(std::vector<int16_t> &x, std::vector<std::complex<double> > &hf)
 {
     std::complex<double> *xf = rfft16(x.data(), x.size());
     std::complex<double> yf[x.size()];
@@ -294,10 +320,11 @@ std::vector<int16_t> convolution_fft(std::vector<int16_t> &x, std::vector<std::c
 //WWW - circular fft convolution
 //output size = max(input size 1, input size 2)
 //x = [1,2,2], y = [1,3,1], X = fft(x), Y = fft(y), ifft(X*Y) = [9,7,9]
-std::vector<int16_t> convolution_fft_circ(const std::vector<int16_t> &x, const std::vector<int16_t> &h)
+template<typename T>
+std::vector<T> convolution_fft_circ(const std::vector<T> &x, const std::vector<T> &h)
 {
-    std::vector<int16_t> x_padded = x;
-    std::vector<int16_t> h_padded = h;
+    std::vector<T> x_padded = x;
+    std::vector<T> h_padded = h;
     zero_pad(x_padded, h_padded);
 
     std::complex<double> *xf = fft_cpp(x_padded.data(), x_padded.size());
@@ -307,7 +334,7 @@ std::vector<int16_t> convolution_fft_circ(const std::vector<int16_t> &x, const s
     for(unsigned i=0; i<h_padded.size(); i++)
         yf[i] = xf[i]*hf[i];
 
-    std::vector<int16_t> y(std::max(x.size(), h.size()));
+    std::vector<T> y(std::max(x.size(), h.size()));
 
     std::complex<double> *tmp = ifft_cpp(yf, x_padded.size());
     for(unsigned i=0; i<x_padded.size(); i++)
@@ -315,7 +342,7 @@ std::vector<int16_t> convolution_fft_circ(const std::vector<int16_t> &x, const s
         std::cout << y[i%y.size()] << " + "
                   << tmp[i].real() << " = "
                   << y[i%y.size()] + tmp[i].real() << std::endl;*/
-        y[i%y.size()] += (int16_t)tmp[i].real();
+        y[i%y.size()] += (T)tmp[i].real();
     }
     delete [] xf;
     delete [] hf;
@@ -323,7 +350,6 @@ std::vector<int16_t> convolution_fft_circ(const std::vector<int16_t> &x, const s
 
     return y;
 }
-
 
 std::vector<int16_t> overlap_add_conv(const std::vector<int16_t> &x, const std::vector<int16_t> &h)
 {
@@ -406,3 +432,4 @@ void window(std::vector<int16_t> &audio_buf, unsigned len)
         audio_buf[i] *= (0.42 - 0.5*cos(2*M_PI*i/(len-1)) + 0.08*cos(4*M_PI*i/(len-1)));
     }
 }
+

@@ -10,9 +10,13 @@
 #define av_frame_free avcodec_free_frame
 #endif
 
-
-void update_volume(std::vector<std::vector<int16_t> > &splitted_channels, int balance, int master_volume)
+template<typename T>
+void update_volume(std::vector<std::vector<T> > &splitted_channels, unsigned master_volume, unsigned balance)
 {
+    for(unsigned i=0; i<splitted_channels.size(); i++)
+        for(unsigned j=0; j<splitted_channels[0].size(); j++)
+            splitted_channels[i][j] *= std::pow(10, (-48+(54.0*master_volume)/100)/20);
+
 
     if(splitted_channels.size() == 2)
         for(unsigned i=0; i<splitted_channels[0].size(); i++)
@@ -20,11 +24,6 @@ void update_volume(std::vector<std::vector<int16_t> > &splitted_channels, int ba
             splitted_channels[0][i] *= (2 - (balance/100.0));
             splitted_channels[1][i] *= balance/100.0;
         }
-
-    for(unsigned i=0; i<splitted_channels.size(); i++)
-        for(unsigned j=0; j<splitted_channels[0].size(); j++)
-            splitted_channels[i][j] *= (master_volume/100.0);
-
 }
 
 template<typename T>
@@ -58,7 +57,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
     TrackState *track_state = ((UserData*)userdata)->track_state;
     FilterState *filter_state = ((UserData*)userdata)->filter_state;
     AVCodecContext *codec_ctx = track_state->codec_context; //Codec informacija
-    BaseFilter::Method filter_method = filter_state->filter_method;
+    Filter::Method filter_method = filter_state->filter_method;
 
     unsigned num_channels = codec_ctx->channels;
     unsigned sample_size = track_state->audio_sample_size;
@@ -99,7 +98,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
 
 //FFT GOES HERE
 //
-        if(filter_state->filter_enabled == false)
+        if(filter_state->filter_enabled == false || filter_state->filters.size() == 0)
         {
             memcpy(stream, audio_buf + audio_buf_index, len1);
 
@@ -107,7 +106,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
             len -= len1;
             audio_buf_index += len1;
         }
-        else if(filter_method == BaseFilter::FFT)
+        else //if(filter_method == Filter::NONE)
         {
             int tmp=0;
             if(len2+len1 > FFT_AUDIO_BUFFER_SIZE)
@@ -127,14 +126,14 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
                 std::vector<std::vector<float> > splitted_channels;
                 split_channels((float *)fft_buf, len2/sample_size, num_channels, splitted_channels);
 
-                BaseFilter *filter = filter_state->filters[0];
+                Filter *filter = filter_state->filters[0];
                 filter->set_kernel_size(len2/(num_channels*sample_size));
                 filter->set_sample_rate(44100);
                 filter->update_kernel();
 
         //AUDIO PROCESSING
         //
-//                update_volume(splitted_channels, len2/4);
+                update_volume(splitted_channels, filter_state->master_volume, filter_state->balance);
                 for(unsigned i=0; i<num_channels; i++)
                 {
 //                    window(splitted_channels[i], len2/4);
@@ -159,18 +158,20 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
             len -= len1;
             audio_buf_index += len1;
         }
-        else
+        /*else
         {
+//            std::cout << len1/(num_channels*sample_size) << std::endl;
             memcpy(fft_buf, audio_buf + audio_buf_index, len1);
 
             std::vector<std::vector<float> > splitted_channels;
             split_channels((float *)fft_buf, len1/sample_size, num_channels, splitted_channels);
 
             //INITIALIZE FILTERS HERE
-            BaseFilter *filter = filter_state->filters[0];
-            filter->set_kernel_size(len1/(num_channels*sample_size));
+            Filter *filter = filter_state->filters[0];
+            filter->set_kernel_size(len1/(sample_size*num_channels));
             filter->set_sample_rate(44100);
             filter->update_kernel();
+
     //AUDIO PROCESSING
     //
 //            update_volume(splitted_channels, len2/sample_size);
@@ -188,7 +189,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
             stream += len1;
             len -= len1;
             audio_buf_index += len1;
-        }
+        }*/
 //
 //FFT GOES HERE
    }
@@ -293,7 +294,8 @@ void audio_callback2(void *userdata, Uint8 *stream, int len)
 
         len1 = audio_buf_size - audio_buf_index;
         if(len1 > len)
-        len1 = len;
+            len1 = len;
+
         memcpy(stream, (uint8_t *)audio_buf + audio_buf_index, len1);
         len -= len1;
         stream += len1;

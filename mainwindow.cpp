@@ -36,12 +36,19 @@ MainWindow::MainWindow() :
             this, SLOT(radio_low_clicked()));
     connect(ui->RadioHigh, SIGNAL(clicked()),
             this, SLOT(radio_high_clicked()));
-    connect(ui->RadioBand, SIGNAL(clicked()),
-            this, SLOT(radio_band_clicked()));
+    connect(ui->RadioBandPass, SIGNAL(clicked()),
+            this, SLOT(radio_band_pass_clicked()));
+    connect(ui->RadioBandStop, SIGNAL(clicked()),
+            this, SLOT(radio_band_stop_clicked()));
+
     connect(ui->KnobMaster, SIGNAL(valueChanged(int)),
             this, SLOT(knob_master_changed()));
     connect(ui->KnobBalance, SIGNAL(valueChanged(int)),
             this, SLOT(knob_balance_changed()));
+    connect(ui->KnobOrder, SIGNAL(valueChanged(int)),
+            this, SLOT(knob_order_changed()));
+    connect(ui->KnobWidth, SIGNAL(valueChanged(int)),
+            this, SLOT(knob_width_changed()));
 
     connect(ui->SliderGain0, SIGNAL(valueChanged(int)),
             this, SLOT(slider_gain0_changed()));
@@ -77,16 +84,13 @@ MainWindow::MainWindow() :
     QColor color2 = qvariant_cast<QColor>("cornsilk");
 
     QBoxLayout* renderBoxLayout2 = new QBoxLayout(QBoxLayout::LeftToRight);
-    RenderArea *canvasEQ = new RenderArea(ui->page_2);
-    canvasEQ->setObjectName("eq");
-    canvasEQ->setFillGradient(color1, color2);
+    _canvas_eq = new RenderArea(ui->page_2, &_filter_state);
+    _canvas_eq->setObjectName("eq");
+    _canvas_eq->setFillGradient(color1, color2);
     renderBoxLayout2->setContentsMargins(0, 0, 0, 0);
-    renderBoxLayout2->addWidget(canvasEQ);
+    renderBoxLayout2->addWidget(_canvas_eq);
     ui->page_2->setLayout(renderBoxLayout2);
 
-
-    _master_volume = 100;
-    _balance = 100;
 
     _playback_enable = false;
     _playback_stop = false;
@@ -105,14 +109,18 @@ MainWindow::MainWindow() :
     _track_state.sdl_quit = 0;
 
     _filter_state.filter_enabled = false;
-    _filter_state.filter_method = BaseFilter::FFT;
+    _filter_state.filter_method = Filter::NONE;
     _filter_state.f_gain = std::vector<int>(10, 100);
     _filter_state.filters.push_back(new Equalizer(1024, 44100, &_filter_state.f_gain));
-    _filter_state.filter_type = BaseFilter::EQUALIZER;
-    _filter_state.order = 1;
+    _filter_state.filter_type = Filter::EQUALIZER;
+    _filter_state.order = 50;
     _filter_state.cutoff = 1000.0;
-    _filter_state.width = 1.0;
-    _filter_state.dc_gain = 1.0;
+    _filter_state.width = 50.0;
+    _filter_state.dc_gain = 1.5;
+    _filter_state.master_volume = 100;
+    _filter_state.balance = 100;
+    _filter_state.cutoff1 = 1500.0;
+    _filter_state.cutoff2 = 500.0;
 
     _user_data.track_state = &_track_state;
     _user_data.filter_state = &_filter_state;
@@ -380,15 +388,15 @@ void MainWindow::radio_disable_clicked()
 
 void MainWindow::radio_equalizer_clicked()
 {
-    _filter_state.filter_type = BaseFilter::EQUALIZER;
-    _filter_state.filter_method = BaseFilter::FFT;
+    _filter_state.filter_type = Filter::EQUALIZER;
+    _filter_state.filter_method = Filter::NONE;
     ui->StackedWidget->setCurrentIndex(0);
 
     for(unsigned i=0; i<_filter_state.filters.size(); i++)
         delete _filter_state.filters[i];
     _filter_state.filters.clear();
 
-    BaseFilter *equalizer = new Equalizer(1024, 44100, &_filter_state.f_gain);
+    Filter *equalizer = new Equalizer(1024, 44100, &_filter_state.f_gain);
 //    equalizer->update_kernel();
     _filter_state.filters.push_back(equalizer);
 
@@ -406,20 +414,13 @@ void MainWindow::radio_equalizer_clicked()
 
 void MainWindow::radio_low_clicked()
 {
-    _filter_state.filter_type = BaseFilter::LOW_PASS;
-    _filter_state.filter_method = BaseFilter::CONV;
+    _filter_state.filter_type = Filter::LOW_PASS;
+    _filter_state.filter_method = Filter::OA_FFT;
     ui->StackedWidget->setCurrentIndex(1);
 
     for(unsigned i=0; i<_filter_state.filters.size(); i++)
         delete _filter_state.filters[i];
     _filter_state.filters.clear();
-
-    unsigned *order = &_filter_state.order;
-    double *cutoff = &_filter_state.cutoff;
-    double *gain = &_filter_state.dc_gain;
-    BaseFilter *low_pass = new LowPass(1024, 44100, order, cutoff, gain);
-//    low_pass->update_kernel();
-    _filter_state.filters.push_back(low_pass);
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);
@@ -435,20 +436,13 @@ void MainWindow::radio_low_clicked()
 
 void MainWindow::radio_high_clicked()
 {
-    _filter_state.filter_type = BaseFilter::HIGH_PASS;
-    _filter_state.filter_method = BaseFilter::OA_CONV;
+    _filter_state.filter_type = Filter::HIGH_PASS;
+    _filter_state.filter_method = Filter::OA_FFT;
     ui->StackedWidget->setCurrentIndex(1);
 
     for(unsigned i=0; i<_filter_state.filters.size(); i++)
         delete _filter_state.filters[i];
     _filter_state.filters.clear();
-
-    unsigned *order = &_filter_state.order;
-    double *cutoff = &_filter_state.cutoff;
-    double *gain = &_filter_state.dc_gain;
-    BaseFilter *high_pass = new HighPass(1024, 44100, order, cutoff, gain);
-//    high_pass->update_kernel();
-    _filter_state.filters.push_back(high_pass);
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);
@@ -462,23 +456,37 @@ void MainWindow::radio_high_clicked()
     ui->SliderGain9->setEnabled(false);
 }
 
-void MainWindow::radio_band_clicked()
+void MainWindow::radio_band_pass_clicked()
 {
-    _filter_state.filter_type = BaseFilter::BAND_PASS;
-    _filter_state.filter_method = BaseFilter::OA_FFT;
+    _filter_state.filter_type = Filter::BAND_PASS;
+    _filter_state.filter_method = Filter::OA_FFT;
     ui->StackedWidget->setCurrentIndex(1);
 
     for(unsigned i=0; i<_filter_state.filters.size(); i++)
         delete _filter_state.filters[i];
     _filter_state.filters.clear();
 
-    unsigned *order = &_filter_state.order;
-    double *mean = &_filter_state.cutoff;
-    double *width = &_filter_state.width;
-    double *gain = &_filter_state.dc_gain;
-    BaseFilter *band_pass = new BandPass(1024, 44100, order, mean, width, gain);
-//    band_pass->update_kernel();
-    _filter_state.filters.push_back(band_pass);
+    ui->SliderGain0->setEnabled(false);
+    ui->SliderGain1->setEnabled(false);
+    ui->SliderGain2->setEnabled(false);
+    ui->SliderGain3->setEnabled(false);
+    ui->SliderGain4->setEnabled(false);
+    ui->SliderGain5->setEnabled(false);
+    ui->SliderGain6->setEnabled(false);
+    ui->SliderGain7->setEnabled(false);
+    ui->SliderGain8->setEnabled(false);
+    ui->SliderGain9->setEnabled(false);
+}
+
+void MainWindow::radio_band_stop_clicked()
+{
+    _filter_state.filter_type = Filter::BAND_STOP;
+    _filter_state.filter_method = Filter::OA_FFT;
+    ui->StackedWidget->setCurrentIndex(1);
+
+    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+        delete _filter_state.filters[i];
+    _filter_state.filters.clear();
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);
@@ -495,14 +503,27 @@ void MainWindow::radio_band_clicked()
 
 void MainWindow::knob_master_changed()
 {
-    _master_volume = ui->KnobMaster->value();
+    _filter_state.master_volume = ui->KnobMaster->value();
 }
 
 void MainWindow::knob_balance_changed()
 {
-    _balance = ui->KnobBalance->value();
+    _filter_state.balance = ui->KnobBalance->value();
 }
 
+void MainWindow::knob_order_changed()
+{
+    _filter_state.order = ui->KnobOrder->value();
+    _filter_state.filters[0]->update_kernel();
+    _canvas_eq->repaint();
+}
+
+void MainWindow::knob_width_changed()
+{
+    _filter_state.width = ui->KnobWidth->value();
+    _filter_state.filters[0]->update_kernel();
+    _canvas_eq->repaint();
+}
 
 void MainWindow::slider_gain0_changed()
 {

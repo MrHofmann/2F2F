@@ -4,12 +4,14 @@
 #include <QWidget>
 #include <QtGui>
 
+#include "datastructures.h"
+
 class RenderArea : public QWidget
 {
     Q_OBJECT
 public:
     explicit RenderArea(const QPainterPath &path, QWidget *parent = nullptr);
-    explicit RenderArea(QWidget *parent = nullptr);
+    explicit RenderArea(QWidget *parent = nullptr, FilterState *filter_state = nullptr);
 
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
@@ -25,8 +27,17 @@ public slots:
 
 protected:
     void paintEvent(QPaintEvent *e) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
 
 private:
+    double locationToFrequency(QPoint p) const;
+    double locationToVolume(QPoint p) const;
+
+private:
+    FilterState *_filter_state;
+
     QPainterPath _path;
     QColor _penColor;
     int _penWidth;

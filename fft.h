@@ -14,6 +14,8 @@ void zero_pad(std::vector<T> &x, unsigned power);
 template<typename T>
 void zero_pad(std::vector<T> &x, std::vector<T> &h);
 
+template<typename T>
+void zero_pad(std::vector<T> &x, std::vector<std::complex<double> > &f);
 
 template<typename T>
 std::complex<double> *fft_cpp(const T samples[], unsigned len);
@@ -35,18 +37,22 @@ void butterworth(double cutoff, double rate, double &b0, double &b1, double &b2,
 
 
 //NUMERICKE METODE - circular convolution
-std::vector<int16_t> convolution_circ(const std::vector<int16_t> &x, const std::vector<int16_t> &h);
+template<typename T>
+std::vector<T> convolution_circ(const std::vector<T> &x, const std::vector<T> &h);
 //DSP GUIDE - output side algorithm (linear convolution)
-std::vector<int16_t> convolution_out(const std::vector<int16_t> &x, const std::vector<int16_t> &h);
+template<typename T>
+std::vector<T> convolution_out(const std::vector<T> &x, const std::vector<T> &h);
 //DSP GUIDE - input side algorithm (linear convolution)
-std::vector<int16_t> convolution_in(const std::vector<int16_t> &x, const std::vector<int16_t> &h);
+template<typename T>
+std::vector<T> convolution_in(const std::vector<T> &x, const std::vector<T> &h);
 
 
-std::vector<int16_t> convolution_fft(const std::vector<int16_t> &x, const std::vector<int16_t> &h);
+template<typename T>
+std::vector<T> convolution_fft(const std::vector<T> &x, const std::vector<T> &h);
 
-std::vector<int16_t> convolution_fft(std::vector<int16_t> &x, std::vector<std::complex<double> > &hf);
-
-std::vector<int16_t> convolution_fft_circ(const std::vector<int16_t> &x, const std::vector<int16_t> &h);
+std::vector<int16_t> convolution_fft16(std::vector<int16_t> &x, std::vector<std::complex<double> > &hf);
+template<typename T>
+std::vector<T> convolution_fft_circ(const std::vector<T> &x, const std::vector<T> &h);
 
 
 

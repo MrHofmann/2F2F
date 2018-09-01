@@ -13,11 +13,10 @@ extern "C" {
 
 #define SDL_AUDIO_BUFFER_SIZE 32768
 #define FFT_AUDIO_BUFFER_SIZE 65536
+//#define SDL_AUDIO_BUFFER_SIZE 8192
+//#define FFT_AUDIO_BUFFER_SIZE 16384
 #define MAX_AUDIO_FRAME_SIZE 192000
 
-
-//enum FilterType {EQUALIZER, LOW_PASS, HIGH_PASS, BAND_PASS, BAND_STOP};
-//enum FilterMethod {NONE, CONV, FFT, OA_CONV, OA_FFT};
 
 typedef struct PacketQueue{
     std::list<AVPacket*> queue;
@@ -51,17 +50,24 @@ typedef struct TrackState{
 
 
 typedef struct FilterState{
-    std::vector<BaseFilter*> filters;
+    std::vector<Filter*> filters;
 
-    BaseFilter::Type filter_type;
-    BaseFilter::Method filter_method;
+    Filter::Type filter_type;
+    Filter::Method filter_method;
 
     bool filter_enabled;
     std::vector<int> f_gain;
+    double dc_gain;
     unsigned order;
     double cutoff;
+
+    double cutoff1;
+    double cutoff2;
     double width;
-    double dc_gain;
+
+    unsigned master_volume;
+    unsigned balance;
+
 } FilterState;
 
 
