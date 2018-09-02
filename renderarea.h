@@ -37,12 +37,13 @@ private:
 
 private:
     FilterState *_filter_state;
+    QPoint _location;
 
-    QPainterPath _path;
-    QColor _penColor;
     int _penWidth;
+    QColor _penColor;
     QColor _fillColor1;
     QColor _fillColor2;
+    QPainterPath _path;
 //    int _rotationAngle;
 };
 

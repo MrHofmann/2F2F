@@ -98,4 +98,25 @@ private:
     double _cutoff_hp;
 };
 
+class BandStop : public Filter
+{
+public:
+    BandStop(){}
+    BandStop(unsigned size, double sample_rate,  unsigned *order,
+             double *cutoff1, double *cutoff2, double *width, double *gain);
+
+    virtual Type type() const;
+    virtual void update_kernel();
+
+private:
+    unsigned *_order;
+    double *_cutoff1;
+    double *_cutoff2;
+    double *_width;
+    double *_gain;
+
+    double _cutoff_lp;
+    double _cutoff_hp;
+};
+
 #endif // FILTAH_H

@@ -158,38 +158,6 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
             len -= len1;
             audio_buf_index += len1;
         }
-        /*else
-        {
-//            std::cout << len1/(num_channels*sample_size) << std::endl;
-            memcpy(fft_buf, audio_buf + audio_buf_index, len1);
-
-            std::vector<std::vector<float> > splitted_channels;
-            split_channels((float *)fft_buf, len1/sample_size, num_channels, splitted_channels);
-
-            //INITIALIZE FILTERS HERE
-            Filter *filter = filter_state->filters[0];
-            filter->set_kernel_size(len1/(sample_size*num_channels));
-            filter->set_sample_rate(44100);
-            filter->update_kernel();
-
-    //AUDIO PROCESSING
-    //
-//            update_volume(splitted_channels, len2/sample_size);
-            for(unsigned i=0; i<num_channels; i++)
-            {
-//                window(splitted_channels[i], len2/sample_size);
-                splitted_channels[i] = filter->convolve(splitted_channels[i], filter_state->filter_method);
-            }
-    //
-    //AUDIO PROCESSING
-
-            merge_channels(splitted_channels, (float *)fft_buf, len1/sample_size);
-            memcpy(stream, fft_buf, len1);
-
-            stream += len1;
-            len -= len1;
-            audio_buf_index += len1;
-        }*/
 //
 //FFT GOES HERE
    }
@@ -376,6 +344,40 @@ int audio_decode_frame2(TrackState *track_state, uint8_t *audio_buf, int buf_siz
         audio_pkt_size = avpkt.size;
     }
 }
+
+
+/*else
+{
+//            std::cout << len1/(num_channels*sample_size) << std::endl;
+    memcpy(fft_buf, audio_buf + audio_buf_index, len1);
+
+    std::vector<std::vector<float> > splitted_channels;
+    split_channels((float *)fft_buf, len1/sample_size, num_channels, splitted_channels);
+
+    //INITIALIZE FILTERS HERE
+    Filter *filter = filter_state->filters[0];
+    filter->set_kernel_size(len1/(sample_size*num_channels));
+    filter->set_sample_rate(44100);
+    filter->update_kernel();
+
+//AUDIO PROCESSING
+//
+//            update_volume(splitted_channels, len2/sample_size);
+    for(unsigned i=0; i<num_channels; i++)
+    {
+//                window(splitted_channels[i], len2/sample_size);
+        splitted_channels[i] = filter->convolve(splitted_channels[i], filter_state->filter_method);
+    }
+//
+//AUDIO PROCESSING
+
+    merge_channels(splitted_channels, (float *)fft_buf, len1/sample_size);
+    memcpy(stream, fft_buf, len1);
+
+    stream += len1;
+    len -= len1;
+    audio_buf_index += len1;
+}*/
 
 /*if(filter_method == CONV)
 {

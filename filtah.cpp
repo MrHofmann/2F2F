@@ -231,6 +231,12 @@ BandPass::BandPass(unsigned kernel_size, double sample_rate, unsigned *order, do
     update_kernel();
 }
 
+BandStop::BandStop(unsigned kernel_size, double sample_rate, unsigned *order, double *cutoff1, double *cutoff2, double *width, double *gain)
+    :Filter(kernel_size, sample_rate), _order(order), _cutoff1(cutoff1), _cutoff2(cutoff2), _width(width), _gain(gain)
+{
+    update_kernel();
+}
+
 
 
 Filter::Type Equalizer::type() const
@@ -251,6 +257,11 @@ return HIGH_PASS;
 Filter::Type BandPass::type() const
 {
 return BAND_PASS;
+}
+
+Filter::Type BandStop::type() const
+{
+    return BAND_STOP;
 }
 
 
@@ -315,16 +326,16 @@ void BandPass::update_kernel()
     _kernel = std::vector<double>(_kernel_size);
     for(unsigned i=0; i<_kernel_size; i++)
         _kernel[i] = butter_lp[i].real()*butter_hp[i].real();
+}
 
-//    for(unsigned i=0; i<_kernel_size/2; i++)
-//        std::cout << butter_lp[i].real() << " ";
-//    std::cout << std::endl << std::endl;
+void BandStop::update_kernel()
+{
+    std::vector<std::complex<double> > butter_lp;
+    butter_lp = butterworth_lp(_kernel_size, _sample_rate, *_order, *_cutoff2, *_gain);
+    std::vector<std::complex<double> > butter_hp;
+    butter_hp = butterworth_hp(_kernel_size, _sample_rate, *_order, *_cutoff1, *_gain);
 
-//    for(unsigned i=0; i<_kernel_size/2; i++)
-//        std::cout << butter_hp[i].real() << " ";
-//    std::cout << std::endl << std::endl;
-
-//    for(unsigned i=0; i<_kernel_size/2; i++)
-//        std::cout << _kernel[i] << " ";
-//    std::cout << std::endl;
+    _kernel = std::vector<double>(_kernel_size);
+    for(unsigned i=0; i<_kernel_size; i++)
+        _kernel[i] = butter_lp[i].real() + butter_hp[i].real();
 }

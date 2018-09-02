@@ -6,9 +6,8 @@
 RenderArea::RenderArea(QWidget *parent, FilterState *filter_state)
     : QWidget(parent), _filter_state(filter_state)
 {
-    QColor color = qvariant_cast<QColor>("black");
-    _penColor = color;
-    _penWidth = 2;
+    _penColor = qvariant_cast<QColor>("black");
+    _penWidth = 3;
 //    rotationAngle = 0;
     setBackgroundRole(QPalette::Base);
 }
@@ -16,10 +15,9 @@ RenderArea::RenderArea(QWidget *parent, FilterState *filter_state)
 RenderArea::RenderArea(const QPainterPath &path, QWidget *parent)
     : QWidget(parent), _path(path)
 {
-    QColor color = qvariant_cast<QColor>("mediumslateblue");
-    _penColor = color;
-    _penWidth = 2;
-    _path.moveTo(0, height()/2);
+    _penColor = qvariant_cast<QColor>("cornsilk");
+    _penWidth = 3;
+    _path.moveTo(0, 0);
 //    rotationAngle = 0;
     setBackgroundRole(QPalette::Base);
 }
@@ -60,11 +58,7 @@ void RenderArea::setFillGradient(const QColor &color1, const QColor &color2)
     update();
 }
 
-//void RenderArea::setRotationAngle(int degrees)
-//{
-//    _rotationAngle = degrees;
-//    update();
-//}
+
 
 void RenderArea::paintEvent(QPaintEvent *e)
 {
@@ -75,30 +69,60 @@ void RenderArea::paintEvent(QPaintEvent *e)
 //    painter.rotate(-rotationAngle);
 //    painter.translate(-50.0, -50.0);
 //    painter.drawRect(0, 0, width()-1, height()-1);
+//    QColor color1 = qvariant_cast<QColor>("mediumslateblue");
 
+    _penColor = qvariant_cast<QColor>("cornsilk");
     painter.setPen(QPen(_penColor, _penWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     QLinearGradient gradient(0, 0, 0, 100);
     gradient.setColorAt(0.0, _fillColor1);
     gradient.setColorAt(1.0, _fillColor2);
     painter.setBrush(gradient);
 
-    painter.drawPath(_path);
 
     if(_filter_state->filter_enabled == true && _filter_state->filters.empty() == false)
     {
         Filter *filter = _filter_state->filters[0];
         std::vector<double> kernel = filter->kernel();
+        double w = _filter_state->width;
+        double lx = _location.x();
+        double c1 = lx + w/2;
+        double c2 = lx - w/2;
+
+        _filter_state->cutoff1 = locationToFrequency(QPoint(c1, _location.y()));
+        _filter_state->cutoff2 = locationToFrequency(QPoint(c2, _location.y()));
+        filter->update_kernel();
+
+        std::vector<QPoint> responsePoints;
         for(unsigned i=0; i<kernel.size()/2; i++)
         {
             double freq_max = filter->sample_rate()/2;
             double freq = i*(freq_max*2/(kernel.size()));
 
 //            double x = std::log(i+1)*width()/std::log(kernel.size()/2);
+//            double x = i*width()/(kernel.size()/2);
             double x = freq*width()/freq_max;
             double y = height() - (kernel[i]*height())/(3.0);
-            painter.drawPoint(x, y);
-//            std::cout << x << std::endl;
+
+            QPoint p(x, y);
+            responsePoints.push_back(p);
+//            painter.drawPoint(x, y);
         }
+
+        std::vector<QPainterPath> responsePath;
+        for(unsigned i=0; i<responsePoints.size()-4; i+=5)
+        {
+            QPoint start = responsePoints[i];
+            QPoint mid = responsePoints[i+2];
+            QPoint end = responsePoints[i+4];
+            QPoint c1 = (start+mid)/2;
+            QPoint c2 = (mid+end)/2;
+
+            QPainterPath bezierPath;
+            bezierPath.moveTo(start);
+            bezierPath.cubicTo(c1, c2, end);
+            painter.drawPath(bezierPath);
+        }
+
     }
 }
 
@@ -107,11 +131,14 @@ void RenderArea::mousePressEvent(QMouseEvent *event)
     if(_filter_state->filter_enabled)
     {
         QPoint p = mapFromGlobal(QCursor::pos());
+        _location = p;
+
         double x = locationToFrequency(p);
         double y = locationToVolume(p);
         double w = _filter_state->width;
         double c1 = locationToFrequency(QPoint(p.x()+w/2, p.y()));
         double c2 = locationToFrequency(QPoint(p.x()-w/2, p.y()));
+
         _filter_state->cutoff = x;
         _filter_state->dc_gain = y;
         _filter_state->cutoff1 = c1;
@@ -140,14 +167,14 @@ void RenderArea::mousePressEvent(QMouseEvent *event)
                 filter = new BandPass(1024, 44100, order, cutoff1, cutoff2, width, gain);
                 break;
             case Filter::BAND_STOP:
-                filter = new BandPass(1024, 44100, order, cutoff1, cutoff2, width, gain);
+                filter = new BandStop(1024, 44100, order, cutoff1, cutoff2, width, gain);
                 break;
             default:
                 break;
         }
     //    filter->update_kernel();
         _filter_state->filters.push_back(filter);
-        repaint();
+        update();
     }
 }
 
@@ -157,7 +184,7 @@ void RenderArea::mouseReleaseEvent(QMouseEvent *event)
     {
         double x = locationToFrequency(mapFromGlobal(QCursor::pos()));
         std::cout << "RELEASE: " << x << ", " << _filter_state->cutoff << std::endl;
-        repaint();
+        update();
     }
 }
 
@@ -166,11 +193,14 @@ void RenderArea::mouseMoveEvent(QMouseEvent *event)
     if(_filter_state->filter_enabled)
     {
         QPoint p = mapFromGlobal(QCursor::pos());
+        _location = p;
+
         double x = locationToFrequency(p);
         double y = locationToVolume(p);
         double w = _filter_state->width;
         double c1 = locationToFrequency(QPoint(p.x()+w/2, p.y()));
         double c2 = locationToFrequency(QPoint(p.x()-w/2, p.y()));
+
         _filter_state->cutoff = x;
         _filter_state->dc_gain = y;
         _filter_state->cutoff1 = c1;
@@ -199,14 +229,14 @@ void RenderArea::mouseMoveEvent(QMouseEvent *event)
                 filter = new BandPass(1024, 44100, order, cutoff1, cutoff2, width, gain);
                 break;
             case Filter::BAND_STOP:
-                filter = new BandPass(1024, 44100, order, cutoff1, cutoff2, width, gain);
+                filter = new BandStop(1024, 44100, order, cutoff1, cutoff2, width, gain);
                 break;
             default:
                 break;
         }
     //    filter->update_kernel();
         _filter_state->filters.push_back(filter);
-        repaint();
+        update();
     }
 }
 
@@ -219,3 +249,10 @@ double RenderArea::locationToVolume(QPoint p) const
 {
     return 3.0 - 3.0*p.y()/height();
 }
+
+
+//void RenderArea::setRotationAngle(int degrees)
+//{
+//    _rotationAngle = degrees;
+//    update();
+//}

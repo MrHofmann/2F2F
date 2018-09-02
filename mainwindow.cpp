@@ -73,9 +73,16 @@ MainWindow::MainWindow() :
 
 
     QPalette palette = ui->centralWidget->palette();
-    palette.setColor(QPalette::Background, QColor(149, 97, 171));
+//    palette.setColor(QPalette::Background, QColor(149, 0, 171));
+//    palette.setColor(QPalette::Background, QColor(149, 97, 171));
+//    palette.setColor(QPalette::Background, QColor(62, 0, 118));
+//    palette.setColor(QPalette::Background, QColor(89, 0, 170));
+//    palette.setColor(QPalette::Background, QColor(129, 0, 244));
+    palette.setColor(QPalette::Background, QColor(159, 53, 255));
+
     ui->page_2->setAutoFillBackground(true);
     ui->page_2->setPalette(palette);
+
 //    palette.setColor(QPalette::Background, QColor(103, 100, 168));
 //    ui->centralWidget->setAutoFillBackground(true);
 //    ui->centralWidget->setPalette(palette);
@@ -83,14 +90,13 @@ MainWindow::MainWindow() :
     QColor color1 = qvariant_cast<QColor>("mediumslateblue");
     QColor color2 = qvariant_cast<QColor>("cornsilk");
 
-    QBoxLayout* renderBoxLayout2 = new QBoxLayout(QBoxLayout::LeftToRight);
+    QBoxLayout* renderBoxLayout = new QBoxLayout(QBoxLayout::LeftToRight);
     _canvas_eq = new RenderArea(ui->page_2, &_filter_state);
     _canvas_eq->setObjectName("eq");
     _canvas_eq->setFillGradient(color1, color2);
-    renderBoxLayout2->setContentsMargins(0, 0, 0, 0);
-    renderBoxLayout2->addWidget(_canvas_eq);
-    ui->page_2->setLayout(renderBoxLayout2);
-
+    renderBoxLayout->setContentsMargins(0, 0, 0, 0);
+    renderBoxLayout->addWidget(_canvas_eq);
+    ui->page_2->setLayout(renderBoxLayout);
 
     _playback_enable = false;
     _playback_stop = false;
@@ -514,16 +520,23 @@ void MainWindow::knob_balance_changed()
 void MainWindow::knob_order_changed()
 {
     _filter_state.order = ui->KnobOrder->value();
-    _filter_state.filters[0]->update_kernel();
-    _canvas_eq->repaint();
+    if(_filter_state.filters.size() > 0)
+    {
+        _filter_state.filters[0]->update_kernel();
+        _canvas_eq->update();
+    }
 }
 
 void MainWindow::knob_width_changed()
 {
     _filter_state.width = ui->KnobWidth->value();
-    _filter_state.filters[0]->update_kernel();
-    _canvas_eq->repaint();
+    if(_filter_state.filters.size() > 0)
+    {
+        _filter_state.filters[0]->update_kernel();
+        _canvas_eq->update();
+    }
 }
+
 
 void MainWindow::slider_gain0_changed()
 {
