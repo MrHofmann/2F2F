@@ -9,6 +9,7 @@ template std::complex<double> *fft_cpp<float>(const float samples[], unsigned le
 template void zero_pad<float>(std::vector<float> &x, unsigned power);
 template void zero_pad<float>(std::vector<float> &x, std::vector<float> &h);
 template void zero_pad<float>(std::vector<float> &x, std::vector<std::complex<double> > &f);
+template void window<float>(std::vector<float> &samples);
 
 
 template std::vector<float> convolution_in<float>(const std::vector<float> &x, const std::vector<float> &h);
@@ -53,6 +54,22 @@ void zero_pad(std::vector<T> &x, std::vector<std::complex<double> > &f)
         x.push_back(0);
     while(f.size() < std::pow(2, power))
         f.push_back(0);
+}
+
+template<typename T>
+void window(std::vector<T> &samples)
+{
+    for(unsigned i=0; i<samples.size(); i++)
+    {
+        //HAMMING
+//        samples[i] *= (0.54 - 0.46*cos(i*2*M_PI/(samples-1)));
+
+        //HANN
+//        samples[i] *= (0.5*(1 - cos(2*M_PI*i/(samples-1))));
+
+        //BLACKMAN
+        samples[i] *= (0.42 - 0.5*cos(2*M_PI*i/(samples.size()-1)) + 0.08*cos(4*M_PI*i/(samples.size()-1)));
+    }
 }
 
 
@@ -176,7 +193,6 @@ std::vector<std::complex<double> > butterworth_lp(unsigned n, double fs, unsigne
     }
 
     return gains;
-
 }
 
 //FIR - Butterworth high-pass filter
@@ -409,27 +425,5 @@ std::vector<int16_t> overlap_add_fft(const std::vector<int16_t> &x, const std::v
     }
 
     return result;
-}
-
-
-
-void equilize(int16_t *audio_buf, int len)
-{
-
-}
-
-void window(std::vector<int16_t> &audio_buf, unsigned len)
-{
-    for(unsigned i=0; i<len; i++)
-    {
-        //HAMMING
-//        audio_buf[i] *= (0.54 - 0.46*cos(i*2*M_PI/(len-1)));
-
-        //HANN
-//        audio_buf[i] *= (0.5*(1 - cos(2*M_PI*i/(len-1))));
-
-        //BLACKMAN
-        audio_buf[i] *= (0.42 - 0.5*cos(2*M_PI*i/(len-1)) + 0.08*cos(4*M_PI*i/(len-1)));
-    }
 }
 

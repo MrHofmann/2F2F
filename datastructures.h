@@ -9,6 +9,7 @@ extern "C" {
 #include <SDL2/SDL_mutex.h>
 #include <SDL2/SDL_audio.h>
 #include <list>
+#include <complex>
 #include "filtah.h"
 
 #define SDL_AUDIO_BUFFER_SIZE 32768
@@ -51,11 +52,14 @@ typedef struct TrackState{
 
 typedef struct FilterState{
     std::vector<Filter*> filters;
+    std::vector<std::complex<double> > frequencies;
 
     Filter::Type filter_type;
     Filter::Method filter_method;
 
     bool filter_enabled;
+    bool filter_initialized;
+
     std::vector<int> f_gain;
     double dc_gain;
     unsigned order;

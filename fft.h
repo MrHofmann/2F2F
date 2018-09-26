@@ -18,6 +18,10 @@ template<typename T>
 void zero_pad(std::vector<T> &x, std::vector<std::complex<double> > &f);
 
 template<typename T>
+void window(std::vector<T> &samples);
+
+
+template<typename T>
 std::complex<double> *fft_cpp(const T samples[], unsigned len);
 
 std::complex<double> *ifft_cpp(const std::complex<double> samples[], unsigned len);
@@ -55,14 +59,8 @@ template<typename T>
 std::vector<T> convolution_fft_circ(const std::vector<T> &x, const std::vector<T> &h);
 
 
-
 std::vector<int16_t> overlap_add_conv(const std::vector<int16_t> &x, const std::vector<int16_t> &h);
 
 std::vector<int16_t> overlap_add_fft(const std::vector<int16_t> &x, const std::vector<int16_t> &h);
-
-
-void equilize(int16_t *audio_buf, int len);
-
-void window(std::vector<int16_t> &audio_buf, int len);
 
 #endif // FFT_H

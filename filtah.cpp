@@ -2,15 +2,13 @@
 #include "fft.h"
 
 #include <iostream>
-#include <complex>
-
 #define DEBUG_ENABLED 0
 
 
-template const std::vector<float> Filter::convolve<float>(const std::vector<float> signal, Method method) const;
+template const std::vector<float> Filter::convolve<float>(const std::vector<float> signal, std::vector<std::complex<double> > &freqs, Method method) const;
 
 template<typename T>
-const std::vector<T> Filter::convolve(const std::vector<T> signal, Method method) const
+const std::vector<T> Filter::convolve(const std::vector<T> signal, std::vector<std::complex<double> > &freqs, Method method) const
 {
     static bool channel = false;
     std::vector<T> output = std::vector<T>(signal.size());
@@ -18,11 +16,51 @@ const std::vector<T> Filter::convolve(const std::vector<T> signal, Method method
     static std::vector<T> overlap1 = std::vector<T>(_kernel_size-1);
     static std::vector<T> overlap2 = std::vector<T>(_kernel_size-1);
 
-    std::vector<std::complex<double> > kernel = std::vector<std::complex<double> >(_kernel_size);
-    for(unsigned i=0; i<_kernel_size; i++)
-        kernel[i] = std::complex<double>(_kernel[i], 0);
-
     if(method == FFT)
+    {
+//        std::cout << "FFT" << std::endl;
+        if(DEBUG_ENABLED)
+        {
+            for(int i=0; i<signal.size(); i++)
+                std::cout << signal[i] << " ";
+            std::cout << std::endl << std::endl;
+        }
+
+        std::complex<double> *isamples;
+        std::complex<double> *fsamples;
+
+        fsamples = fft_cpp(signal.data(), signal.size());
+
+    //AUDIO PROCESSING
+    //
+        for(unsigned i=0; i<signal.size(); i++)
+                fsamples[i] *= _kernel[i];
+    //
+    //AUDIO PROCESSING
+
+
+        isamples = ifft_cpp(fsamples, signal.size());
+
+    //    std::vector<float> tmp(isamples, isamples+samples.size());
+    //    samples.swap(tmp);
+    //    memcpy(samples, isamples,len);
+    //    std::copy(tmp.begin(), tmp.end(), std::back_inserter(samples));
+
+        for(unsigned i=0; i<signal.size(); i++)
+            output[i] = isamples[i].real();
+
+        delete[]  fsamples;
+        delete[]  isamples;
+
+        if(DEBUG_ENABLED)
+        {
+            for(int i=0; i<signal.size(); i++)
+                std::cout << signal[i] << " ";
+            std::cout << std::endl << "-------------------------------------------------------------------------------------" << std::endl
+                      << "-------------------------------------------------------------------------------------" << std::endl;
+        }
+    }
+    else if(method == CONV)
     {
         std::vector<std::complex<double> > kernel = std::vector<std::complex<double> >(_kernel_size);
         for(unsigned i=0; i<_kernel_size; i++)
@@ -35,30 +73,14 @@ const std::vector<T> Filter::convolve(const std::vector<T> signal, Method method
         for(unsigned i=0; i<h.size(); i++)
             h[i] = (T)ikernel[i].real();
 
-        std::vector<T> out = convolution_fft(signal, h);
-
-        for(unsigned i=0; i<signal.size()+_kernel.size()-1; i++)
-        {
-            if(i < output.size())
-                output[i] = out[i];
-            else
-                overlap[i-output.size()] = out[i];
-        }
-    }
-    else if(method == CONV)
-    {
-        std::complex<double> *ikernel = ifft_cpp(kernel.data(), kernel.size());
-        delete [] ikernel;
-
-        std::vector<T> h = std::vector<T>(kernel.size());
-        for(unsigned i=0; i<h.size(); i++)
-            h[i] = (T)ikernel[i].real();
-
         std::vector<T> out = convolution_in(signal, h);
     }
     else if(method == OA_FFT)
     {
-//        std::cout << "OA_FFT" << std::endl;
+        std::vector<std::complex<double> > kernel = std::vector<std::complex<double> >(_kernel_size);
+        for(unsigned i=0; i<_kernel_size; i++)
+            kernel[i] = std::complex<double>(_kernel[i], 0);
+
         std::vector<T> x = signal;
         std::vector<T> y;
 
@@ -108,7 +130,11 @@ const std::vector<T> Filter::convolve(const std::vector<T> signal, Method method
     }
     else if(method == OA_CONV)
     {
-        std::cout << "OA_CONV" << std::endl;
+//        std::cout << "OA_CONV" << std::endl;
+
+        std::vector<std::complex<double> > kernel = std::vector<std::complex<double> >(_kernel_size);
+        for(unsigned i=0; i<_kernel_size; i++)
+            kernel[i] = std::complex<double>(_kernel[i], 0);
 
         std::complex<double> *ikernel = ifft_cpp(kernel.data(), kernel.size());
         delete [] ikernel;
@@ -129,47 +155,19 @@ const std::vector<T> Filter::convolve(const std::vector<T> signal, Method method
     }
     else
     {
-        if(DEBUG_ENABLED)
-        {
-            for(int i=0; i<signal.size(); i++)
-                std::cout << signal[i] << " ";
-            std::cout << std::endl << std::endl;
-        }
-
         std::complex<double> *isamples;
         std::complex<double> *fsamples;
 
         fsamples = fft_cpp(signal.data(), signal.size());
-
-
-    //AUDIO PROCESSING
-    //
         for(unsigned i=0; i<signal.size(); i++)
-                fsamples[i] *= _kernel[i];
-    //
-    //AUDIO PROCESSING
-
+            freqs.push_back(fsamples[i]);
 
         isamples = ifft_cpp(fsamples, signal.size());
-
-    //    std::vector<float> tmp(isamples, isamples+samples.size());
-    //    samples.swap(tmp);
-    //    memcpy(samples, isamples,len);
-    //    std::copy(tmp.begin(), tmp.end(), std::back_inserter(samples));
-
         for(unsigned i=0; i<signal.size(); i++)
             output[i] = isamples[i].real();
 
         delete[]  fsamples;
         delete[]  isamples;
-
-        if(DEBUG_ENABLED)
-        {
-            for(int i=0; i<signal.size(); i++)
-                std::cout << signal[i] << " ";
-            std::cout << std::endl << "-------------------------------------------------------------------------------------" << std::endl
-                      << "-------------------------------------------------------------------------------------" << std::endl;
-        }
     }
 
     channel = !channel;
@@ -182,7 +180,7 @@ const std::vector<T> Filter::convolve(const std::vector<T> signal, Method method
 Filter::Filter(unsigned kernel_size, double sample_rate)
     :_kernel_size(kernel_size), _sample_rate(sample_rate)
 {
-
+    _kernel = std::vector<double>(kernel_size, 1);
 }
 
 std::vector<double> Filter::kernel() const
@@ -198,11 +196,34 @@ double Filter::sample_rate() const
 void Filter::set_kernel_size(unsigned kernel_size)
 {
     _kernel_size = kernel_size;
+    if(type() == EQUALIZER)
+        update_kernel();
 }
 
 void Filter::set_sample_rate(double sample_rate)
 {
     _sample_rate = sample_rate;
+}
+
+void Filter::update_params(unsigned order, double cutoff, double cutoff1, double cutoff2, double gain)
+{
+    switch(type())
+    {
+        case Filter::LOW_PASS:
+            ((LowPass*)this)->set_params(order, cutoff, gain);
+            break;
+        case Filter::HIGH_PASS:
+            ((HighPass*)this)->set_params(order, cutoff, gain);
+            break;
+        case Filter::BAND_PASS:
+            ((BandPass*)this)->set_params(order, cutoff1, cutoff2, gain);
+            break;
+        case Filter::BAND_STOP:
+            ((BandStop*)this)->set_params(order, cutoff2, cutoff1, gain);
+            break;
+        default:
+            break;
+    }
 }
 
 
@@ -213,26 +234,26 @@ Equalizer::Equalizer(unsigned size, double sample_rate, std::vector<int> *f_gain
     update_kernel();
 }
 
-LowPass::LowPass(unsigned kernel_size, double sample_rate, unsigned *order, double *cutoff, double *gain)
+LowPass::LowPass(unsigned kernel_size, double sample_rate, unsigned order, double cutoff, double gain)
     :Filter(kernel_size, sample_rate), _order(order), _cutoff(cutoff), _gain(gain)
 {
     update_kernel();
 }
 
-HighPass::HighPass(unsigned kernel_size, double sample_rate, unsigned *order, double *cutoff, double *gain)
+HighPass::HighPass(unsigned kernel_size, double sample_rate, unsigned order, double cutoff, double gain)
     :Filter(kernel_size, sample_rate), _order(order), _cutoff(cutoff), _gain(gain)
 {
     update_kernel();
 }
 
-BandPass::BandPass(unsigned kernel_size, double sample_rate, unsigned *order, double *cutoff1, double *cutoff2, double *width, double *gain)
-    :Filter(kernel_size, sample_rate), _order(order), _cutoff1(cutoff1), _cutoff2(cutoff2), _width(width), _gain(gain)
+BandPass::BandPass(unsigned kernel_size, double sample_rate, unsigned order, double cutoff_lp, double cutoff_hp, double gain)
+    :Filter(kernel_size, sample_rate), _order(order), _cutoff_lp(cutoff_lp), _cutoff_hp(cutoff_hp), _gain(gain)
 {
     update_kernel();
 }
 
-BandStop::BandStop(unsigned kernel_size, double sample_rate, unsigned *order, double *cutoff1, double *cutoff2, double *width, double *gain)
-    :Filter(kernel_size, sample_rate), _order(order), _cutoff1(cutoff1), _cutoff2(cutoff2), _width(width), _gain(gain)
+BandStop::BandStop(unsigned kernel_size, double sample_rate, unsigned order, double cutoff_lp, double cutoff_hp, double gain)
+    :Filter(kernel_size, sample_rate), _order(order), _cutoff_lp(cutoff_lp), _cutoff_hp(cutoff_hp), _gain(gain)
 {
     update_kernel();
 }
@@ -265,8 +286,40 @@ Filter::Type BandStop::type() const
 }
 
 
+void LowPass::set_params(unsigned order, double cutoff, double gain)
+{
+    _order = order;
+    _cutoff = cutoff;
+    _gain = gain;
+}
+
+void HighPass::set_params(unsigned order, double cutoff, double gain)
+{
+    _order = order;
+    _cutoff = cutoff;
+    _gain = gain;
+}
+
+void BandPass::set_params(unsigned order, double cutoff_lp, double cutoff_hp, double gain)
+{
+    _order = order;
+    _cutoff_lp = cutoff_lp;
+    _cutoff_hp = cutoff_hp;
+    _gain = gain;
+}
+
+void BandStop::set_params(unsigned order, double cutoff_lp, double cutoff_hp, double gain)
+{
+    _order = order;
+    _cutoff_lp = cutoff_lp;
+    _cutoff_hp = cutoff_hp;
+    _gain = gain;
+}
+
+
 void Equalizer::update_kernel()
 {
+    //POGLEDAJ OVO BOLJE, MISLIM DA BROJANJE FREKVENCIJA SA KRAJA NIJE DOBRO
     _kernel = std::vector<double>(_kernel_size);
     for(unsigned i=0; i<_kernel_size; i++)
     {
@@ -299,7 +352,7 @@ void Equalizer::update_kernel()
 void LowPass::update_kernel()
 {
     std::vector<std::complex<double> > butter;
-    butter = butterworth_lp(_kernel_size, _sample_rate, *_order, *_cutoff, *_gain);
+    butter = butterworth_lp(_kernel_size, _sample_rate, _order, _cutoff, _gain);
 
     _kernel = std::vector<double>(_kernel_size);
     for(unsigned i=0; i<butter.size(); i++)
@@ -309,7 +362,7 @@ void LowPass::update_kernel()
 void HighPass::update_kernel()
 {
     std::vector<std::complex<double> > butter;
-    butter = butterworth_hp(_kernel_size, _sample_rate, *_order, *_cutoff, *_gain);
+    butter = butterworth_hp(_kernel_size, _sample_rate, _order, _cutoff, _gain);
 
     _kernel = std::vector<double>(_kernel_size);
     for(unsigned i=0; i<butter.size(); i++)
@@ -319,9 +372,9 @@ void HighPass::update_kernel()
 void BandPass::update_kernel()
 {
     std::vector<std::complex<double> > butter_lp;
-    butter_lp = butterworth_lp(_kernel_size, _sample_rate, *_order, *_cutoff1, *_gain);
+    butter_lp = butterworth_lp(_kernel_size, _sample_rate, _order, _cutoff_lp, _gain);
     std::vector<std::complex<double> > butter_hp;
-    butter_hp = butterworth_hp(_kernel_size, _sample_rate, *_order, *_cutoff2, *_gain);
+    butter_hp = butterworth_hp(_kernel_size, _sample_rate, _order, _cutoff_hp, _gain);
 
     _kernel = std::vector<double>(_kernel_size);
     for(unsigned i=0; i<_kernel_size; i++)
@@ -331,9 +384,9 @@ void BandPass::update_kernel()
 void BandStop::update_kernel()
 {
     std::vector<std::complex<double> > butter_lp;
-    butter_lp = butterworth_lp(_kernel_size, _sample_rate, *_order, *_cutoff2, *_gain);
+    butter_lp = butterworth_lp(_kernel_size, _sample_rate, _order, _cutoff_lp, _gain);
     std::vector<std::complex<double> > butter_hp;
-    butter_hp = butterworth_hp(_kernel_size, _sample_rate, *_order, *_cutoff1, *_gain);
+    butter_hp = butterworth_hp(_kernel_size, _sample_rate, _order, _cutoff_hp, _gain);
 
     _kernel = std::vector<double>(_kernel_size);
     for(unsigned i=0; i<_kernel_size; i++)

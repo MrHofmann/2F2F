@@ -16,6 +16,8 @@ public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
 
+    void setDrawFilter(bool draw);
+
 signals:
 
 public slots:
@@ -34,10 +36,20 @@ protected:
 private:
     double locationToFrequency(QPoint p) const;
     double locationToVolume(QPoint p) const;
+    double frequencyToLocation(double f) const;
+    QColor intensityToColor(std::complex<double> i) const;
+
+    void drawLowPass(QPainter *painter) const;
+    void drawHighPass(QPainter *painter) const;
+    void drawBandPass(QPainter *painter) const;
+    void drawBandStop(QPainter *painter) const;
+    void drawFilter(QPainter *painter) const;
+    void drawFrequencies(QPainter *painter) const;
 
 private:
     FilterState *_filter_state;
     QPoint _location;
+    bool _draw_filter;
 
     int _penWidth;
     QColor _penColor;

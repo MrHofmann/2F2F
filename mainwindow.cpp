@@ -25,6 +25,7 @@ MainWindow::MainWindow() :
     connect(ui->ButtonStop,SIGNAL(clicked()),
             this, SLOT(button_stop_clicked()));
     connect(ui->ButtonExit,SIGNAL(clicked()),
+
             this, SLOT(button_exit_clicked()));
     connect(ui->RadioEnable, SIGNAL(clicked()),
             this, SLOT(radio_enable_clicked()));
@@ -121,12 +122,13 @@ MainWindow::MainWindow() :
     _filter_state.filter_type = Filter::EQUALIZER;
     _filter_state.order = 50;
     _filter_state.cutoff = 1000.0;
-    _filter_state.width = 50.0;
+    _filter_state.width = 100.0;
     _filter_state.dc_gain = 1.5;
     _filter_state.master_volume = 100;
     _filter_state.balance = 100;
     _filter_state.cutoff1 = 1500.0;
     _filter_state.cutoff2 = 500.0;
+    _filter_state.filter_initialized = true;
 
     _user_data.track_state = &_track_state;
     _user_data.filter_state = &_filter_state;
@@ -383,28 +385,40 @@ void MainWindow::button_exit_clicked()
 
 void MainWindow::radio_enable_clicked()
 {
+    if(_filter_state.filter_initialized == true && _filter_state.filters[0]->type() != Filter::EQUALIZER)
+        _filter_state.filter_method = Filter::OA_FFT;
+    else if(_filter_state.filters[0]->type() == Filter::EQUALIZER)
+        _filter_state.filter_method = Filter::FFT;
+
     _filter_state.filter_enabled = true;
 }
 
 void MainWindow::radio_disable_clicked()
 {
     _filter_state.filter_enabled = false;
+    _filter_state.filter_method = Filter::NONE;
 }
 
 
 void MainWindow::radio_equalizer_clicked()
 {
     _filter_state.filter_type = Filter::EQUALIZER;
-    _filter_state.filter_method = Filter::NONE;
-    ui->StackedWidget->setCurrentIndex(0);
+    if(_filter_state.filter_enabled == true)
+        _filter_state.filter_method = Filter::FFT;
+    else
+        _filter_state.filter_method = Filter::NONE;
 
-    for(unsigned i=0; i<_filter_state.filters.size(); i++)
-        delete _filter_state.filters[i];
+    ui->StackedWidget->setCurrentIndex(0);
+    _canvas_eq->setDrawFilter(false);
+
+    //MOGUCE JE CURENJE OVDE
+//    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+//        delete _filter_state.filters[i];
     _filter_state.filters.clear();
 
     Filter *equalizer = new Equalizer(1024, 44100, &_filter_state.f_gain);
-//    equalizer->update_kernel();
     _filter_state.filters.push_back(equalizer);
+    _filter_state.filter_initialized = true;
 
     ui->SliderGain0->setEnabled(true);
     ui->SliderGain1->setEnabled(true);
@@ -421,12 +435,18 @@ void MainWindow::radio_equalizer_clicked()
 void MainWindow::radio_low_clicked()
 {
     _filter_state.filter_type = Filter::LOW_PASS;
-    _filter_state.filter_method = Filter::OA_FFT;
+    _filter_state.filter_method = Filter::NONE;
     ui->StackedWidget->setCurrentIndex(1);
+    _canvas_eq->setDrawFilter(false);
+    _canvas_eq->update();
 
-    for(unsigned i=0; i<_filter_state.filters.size(); i++)
-        delete _filter_state.filters[i];
+    //MOGUCE JE CURENJE OVDE
+//    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+//        delete _filter_state.filters[i];
     _filter_state.filters.clear();
+
+    _filter_state.filters.push_back(new LowPass());
+    _filter_state.filter_initialized = false;
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);
@@ -443,12 +463,18 @@ void MainWindow::radio_low_clicked()
 void MainWindow::radio_high_clicked()
 {
     _filter_state.filter_type = Filter::HIGH_PASS;
-    _filter_state.filter_method = Filter::OA_FFT;
+    _filter_state.filter_method = Filter::NONE;
     ui->StackedWidget->setCurrentIndex(1);
+    _canvas_eq->setDrawFilter(false);
+    _canvas_eq->update();
 
-    for(unsigned i=0; i<_filter_state.filters.size(); i++)
-        delete _filter_state.filters[i];
+    //MOGUCE JE CURENJE OVDE
+//    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+//        delete _filter_state.filters[i];
     _filter_state.filters.clear();
+
+    _filter_state.filters.push_back(new HighPass());
+    _filter_state.filter_initialized = false;
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);
@@ -465,12 +491,18 @@ void MainWindow::radio_high_clicked()
 void MainWindow::radio_band_pass_clicked()
 {
     _filter_state.filter_type = Filter::BAND_PASS;
-    _filter_state.filter_method = Filter::OA_FFT;
+    _filter_state.filter_method = Filter::NONE;
     ui->StackedWidget->setCurrentIndex(1);
+    _canvas_eq->setDrawFilter(false);
+    _canvas_eq->update();
 
-    for(unsigned i=0; i<_filter_state.filters.size(); i++)
-        delete _filter_state.filters[i];
+    //MOGUCE JE CURENJE OVDE
+//    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+//        delete _filter_state.filters[i];
     _filter_state.filters.clear();
+
+    _filter_state.filters.push_back(new BandPass());
+    _filter_state.filter_initialized = false;
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);
@@ -487,12 +519,18 @@ void MainWindow::radio_band_pass_clicked()
 void MainWindow::radio_band_stop_clicked()
 {
     _filter_state.filter_type = Filter::BAND_STOP;
-    _filter_state.filter_method = Filter::OA_FFT;
+    _filter_state.filter_method = Filter::NONE;
     ui->StackedWidget->setCurrentIndex(1);
+    _canvas_eq->setDrawFilter(false);
+    _canvas_eq->update();
 
-    for(unsigned i=0; i<_filter_state.filters.size(); i++)
-        delete _filter_state.filters[i];
+    //MOGUCE JE CURENJE OVDE
+//    for(unsigned i=0; i<_filter_state.filters.size(); i++)
+//        delete _filter_state.filters[i];
     _filter_state.filters.clear();
+
+    _filter_state.filters.push_back(new BandStop());
+    _filter_state.filter_initialized = false;
 
     ui->SliderGain0->setEnabled(false);
     ui->SliderGain1->setEnabled(false);
@@ -520,21 +558,31 @@ void MainWindow::knob_balance_changed()
 void MainWindow::knob_order_changed()
 {
     _filter_state.order = ui->KnobOrder->value();
-    if(_filter_state.filters.size() > 0)
-    {
-        _filter_state.filters[0]->update_kernel();
-        _canvas_eq->update();
-    }
+
+    unsigned order = _filter_state.order;
+    double cuttof = _filter_state.cutoff;
+    double cuttof1 = _filter_state.cutoff1;
+    double cuttof2 = _filter_state.cutoff2;
+    double gain = _filter_state.dc_gain;
+
+    _filter_state.filters[0]->update_params(order, cuttof, cuttof1, cuttof2, gain);
+    _filter_state.filters[0]->update_kernel();
+    _canvas_eq->update();
 }
 
 void MainWindow::knob_width_changed()
 {
     _filter_state.width = ui->KnobWidth->value();
-    if(_filter_state.filters.size() > 0)
-    {
-        _filter_state.filters[0]->update_kernel();
-        _canvas_eq->update();
-    }
+
+    unsigned order = _filter_state.order;
+    double cuttof = _filter_state.cutoff;
+    double cuttof1 = _filter_state.cutoff1;
+    double cuttof2 = _filter_state.cutoff2;
+    double gain = _filter_state.dc_gain;
+
+    _filter_state.filters[0]->update_params(order, cuttof, cuttof1, cuttof2, gain);
+    _filter_state.filters[0]->update_kernel();
+    _canvas_eq->update();
 }
 
 

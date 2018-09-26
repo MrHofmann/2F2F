@@ -10,13 +10,13 @@
 #define av_frame_free avcodec_free_frame
 #endif
 
+
 template<typename T>
 void update_volume(std::vector<std::vector<T> > &splitted_channels, unsigned master_volume, unsigned balance)
 {
     for(unsigned i=0; i<splitted_channels.size(); i++)
         for(unsigned j=0; j<splitted_channels[0].size(); j++)
             splitted_channels[i][j] *= std::pow(10, (-48+(54.0*master_volume)/100)/20);
-
 
     if(splitted_channels.size() == 2)
         for(unsigned i=0; i<splitted_channels[0].size(); i++)
@@ -57,7 +57,6 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
     TrackState *track_state = ((UserData*)userdata)->track_state;
     FilterState *filter_state = ((UserData*)userdata)->filter_state;
     AVCodecContext *codec_ctx = track_state->codec_context; //Codec informacija
-    Filter::Method filter_method = filter_state->filter_method;
 
     unsigned num_channels = codec_ctx->channels;
     unsigned sample_size = track_state->audio_sample_size;
@@ -98,66 +97,72 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
 
 //FFT GOES HERE
 //
-        if(filter_state->filter_enabled == false || filter_state->filters.size() == 0)
+        int tmp=0;
+        if(len2+len1 > FFT_AUDIO_BUFFER_SIZE)
         {
-            memcpy(stream, audio_buf + audio_buf_index, len1);
-
-            stream += len1;
-            len -= len1;
-            audio_buf_index += len1;
+            tmp = FFT_AUDIO_BUFFER_SIZE - len2;
+            memcpy(fft_buf + len2, audio_buf + audio_buf_index, tmp);
+            len2 += tmp;
         }
-        else //if(filter_method == Filter::NONE)
+        else
         {
-            int tmp=0;
-            if(len2+len1 > FFT_AUDIO_BUFFER_SIZE)
-            {
-                tmp = FFT_AUDIO_BUFFER_SIZE - len2;
-                memcpy(fft_buf + len2, audio_buf + audio_buf_index, tmp);
-                len2 += tmp;
-            }
-            else
-            {
-                memcpy(fft_buf + len2, audio_buf + audio_buf_index, len1);
-                len2+=len1;
-            }
+            memcpy(fft_buf + len2, audio_buf + audio_buf_index, len1);
+            len2+=len1;
+        }
 
-            if(len2 == FFT_AUDIO_BUFFER_SIZE)
+        if(len2 == FFT_AUDIO_BUFFER_SIZE)
+        {
+            std::vector<std::complex<double> > freqs;
+            std::vector<std::vector<float> > splitted_channels;
+            split_channels((float *)fft_buf, len2/sample_size, num_channels, splitted_channels);
+
+
+            Filter *filter = filter_state->filters[0];
+            filter->set_kernel_size(len2/(num_channels*sample_size));
+            filter->set_sample_rate(44100);
+//                filter->update_kernel();
+
+    //AUDIO PROCESSING
+    //
+            filter_state->frequencies.clear();
+//                update_volume(splitted_channels, filter_state->master_volume, filter_state->balance);
+            for(unsigned i=0; i<num_channels; i++)
             {
-                std::vector<std::vector<float> > splitted_channels;
-                split_channels((float *)fft_buf, len2/sample_size, num_channels, splitted_channels);
+//                    window(splitted_channels[i]);
+                freqs.clear();
+                splitted_channels[i] = filter->convolve(splitted_channels[i], freqs, filter_state->filter_method);
 
-                Filter *filter = filter_state->filters[0];
-                filter->set_kernel_size(len2/(num_channels*sample_size));
-                filter->set_sample_rate(44100);
-                filter->update_kernel();
-
-        //AUDIO PROCESSING
-        //
-                update_volume(splitted_channels, filter_state->master_volume, filter_state->balance);
-                for(unsigned i=0; i<num_channels; i++)
+                if(filter_state->frequencies.empty() == false)
                 {
-//                    window(splitted_channels[i], len2/4);
-                    splitted_channels[i] = filter->convolve(splitted_channels[i], filter_state->filter_method);
+                    for(unsigned i=0; i<freqs.size(); i++)
+                        filter_state->frequencies[i] += freqs[i];
                 }
-        //
-        //AUDIO PROCESSING
-
-                merge_channels(splitted_channels, (float *)fft_buf, len2/sample_size);
-                memcpy(stream, fft_buf, len2);
-
-                stream += len2;
-                len2 = 0;
+                else
+                    filter_state->frequencies = freqs;
             }
 
-            if(tmp != 0)
-            {
-                len1 = tmp;
-                tmp = 0;
-            }
+            for(unsigned i=0; i<filter_state->frequencies.size(); i++)
+                filter_state->frequencies[i] /= num_channels;
+    //
+    //AUDIO PROCESSING
 
-            len -= len1;
-            audio_buf_index += len1;
+            //RENDER HERE
+
+            merge_channels(splitted_channels, (float *)fft_buf, len2/sample_size);
+            memcpy(stream, fft_buf, len2);
+
+            stream += len2;
+            len2 = 0;
         }
+
+        if(tmp != 0)
+        {
+            len1 = tmp;
+            tmp = 0;
+        }
+
+        len -= len1;
+        audio_buf_index += len1;
 //
 //FFT GOES HERE
    }
@@ -344,6 +349,22 @@ int audio_decode_frame2(TrackState *track_state, uint8_t *audio_buf, int buf_siz
         audio_pkt_size = avpkt.size;
     }
 }
+
+
+
+/*
+        if(filter_state->filter_enabled == false || filter_state->filters.size() == 0)
+        {
+            memcpy(stream, audio_buf + audio_buf_index, len1);
+
+            stream += len1;
+            len -= len1;
+            audio_buf_index += len1;
+        }
+
+  */
+
+
 
 
 /*else
